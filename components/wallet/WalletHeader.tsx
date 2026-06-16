@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 type WalletInfo = {
   address: string;
   privateKey: string;
@@ -9,21 +11,17 @@ type WalletInfo = {
 type Props = {
   walletInfo: WalletInfo | null;
   balance: string;
-  showMnemonic: boolean;
-  setShowMnemonic: React.Dispatch<
-    React.SetStateAction<boolean>
-  >;
   copyAddress: () => void;
 };
 
 export default function WalletHeader({
   walletInfo,
   balance,
-  showMnemonic,
-  setShowMnemonic,
   copyAddress,
 }: Props) {
   if (!walletInfo) return null;
+
+  const [showMnemonic, setShowMnemonic] = useState(false);
 
   return (
     <div className="p-4 bg-[#141826] rounded-2xl border border-white/10">
