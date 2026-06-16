@@ -1,17 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import toast, { Toaster } from "react-hot-toast";
+
 import {
   createWallet,
   importFromMnemonic,
   importFromPrivateKey,
 } from "@/lib/wallet";
+
 import { getBalance } from "@/lib/blockchain";
-import { sendPOL } from "@/lib/transaction";
-import {
-  getVotes,
-  vote,
-} from "@/lib/voting";
+import { getVotes, vote } from "@/lib/voting";
 
 type WalletInfo = {
   address: string;
@@ -19,33 +18,34 @@ type WalletInfo = {
   mnemonic?: string;
 };
 
+type TxItem = {
+  hash: string;
+  type: "send" | "vote";
+  timestamp: number;
+  status: "success" | "failed";
+  amount?: string;
+  to?: string;
+};
+
 export default function HomePage() {
-  const [walletInfo, setWalletInfo] =
-    useState<WalletInfo | null>(null);
+  const [walletInfo, setWalletInfo] = useState<WalletInfo | null>(null);
+  const [balance, setBalance] = useState("0");
+  const [votes, setVotes] = useState(0);
 
-  const [balance, setBalance] =
-    useState("0");
+  const [history, setHistory] = useState<TxItem[]>([]);
+  const [tab, setTab] = useState<"wallet" | "activity" | "tokens">("wallet");
 
-  const [votes, setVotes] =
-    useState(0);
+  const [collapsed, setCollapsed] = useState(false);
 
-  const [loading, setLoading] =
-    useState(false);
+  const [privateKey, setPrivateKey] = useState("");
+  const [mnemonic, setMnemonic] = useState("");
 
-  const [privateKey, setPrivateKey] =
-    useState("");
+  const [network, setNetwork] = useState("Polygon Amoy");
 
-  const [mnemonic, setMnemonic] =
-    useState("");
-
-  const [toAddress, setToAddress] =
-    useState("");
-
-  const [amount, setAmount] =
-    useState("");
-
-  const [txHash, setTxHash] =
-    useState("");
+  useEffect(() => {
+    const saved = localStorage.getItem("tx_history");
+    if (saved) setHistory(JSON.parse(saved));
+  }, []);
 
   useEffect(() => {
     loadVotes();
@@ -53,358 +53,312 @@ export default function HomePage() {
 
   const loadVotes = async () => {
     try {
-      const total =
-        await getVotes();
-
-      setVotes(total);
-    } catch (error) {
-      console.error(error);
-    }
+      const t = await getVotes();
+      setVotes(t);
+    } catch {}
   };
 
-  const loadBalance = async (
-    address: string
-  ) => {
+  const loadBalance = async (addr: string) => {
     try {
-      setLoading(true);
+      const b = await getBalance(addr);
+      setBalance(b);
+    } catch {}
+  };
 
-      const walletBalance =
-        await getBalance(address);
+  const addTx = (tx: TxItem) => {
+    setHistory((prev) => {
+      const updated = [tx, ...prev];
+      localStorage.setItem("tx_history", JSON.stringify(updated));
+      return updated;
+    });
+  };
 
-      setBalance(walletBalance);
-    } catch (error) {
-      console.error(error);
-      setBalance("0");
-    } finally {
-      setLoading(false);
+  // ---------------- WALLET ----------------
+  const create = async () => {
+    const w = createWallet();
+    setWalletInfo(w);
+    await loadBalance(w.address);
+    toast.success("Wallet created");
+  };
+
+  const importPK = async () => {
+    try {
+      const w = importFromPrivateKey(privateKey);
+      setWalletInfo(w);
+      await loadBalance(w.address);
+      toast.success("Imported");
+    } catch {
+      toast.error("Invalid private key");
     }
   };
 
-  const handleCreateWallet =
-    async () => {
-      const wallet =
-        createWallet();
+  const importMn = async () => {
+    try {
+      const w = importFromMnemonic(mnemonic);
+      setWalletInfo(w);
+      await loadBalance(w.address);
+      toast.success("Imported");
+    } catch {
+      toast.error("Invalid mnemonic");
+    }
+  };
 
-      setWalletInfo(wallet);
+  // ---------------- COPY ----------------
+  const copyAddress = () => {
+    if (!walletInfo) return;
+    navigator.clipboard.writeText(walletInfo.address);
+    toast.success("Address copied");
+  };
 
-      await loadBalance(
-        wallet.address
-      );
-    };
+  const openExplorer = (hash: string) => {
+    if (hash === "failed") return;
+    window.open(
+      `https://amoy.polygonscan.com/tx/${hash}`,
+      "_blank"
+    );
+  };
 
-  const handleImportPrivateKey =
-    async () => {
-      try {
-        const wallet =
-          importFromPrivateKey(
-            privateKey
-          );
-
-        setWalletInfo(wallet);
-
-        await loadBalance(
-          wallet.address
-        );
-      } catch {
-        alert(
-          "Private Key không hợp lệ"
-        );
-      }
-    };
-
-  const handleImportMnemonic =
-    async () => {
-      try {
-        const wallet =
-          importFromMnemonic(
-            mnemonic
-          );
-
-        setWalletInfo(wallet);
-
-        await loadBalance(
-          wallet.address
-        );
-      } catch {
-        alert(
-          "Mnemonic không hợp lệ"
-        );
-      }
-    };
-
-  const handleRefreshBalance =
-    async () => {
-      if (!walletInfo) return;
-
-      await loadBalance(
-        walletInfo.address
-      );
-    };
-
-  const handleSendPOL =
-    async () => {
-      if (!walletInfo) return;
-
-      try {
-        setLoading(true);
-
-        const hash =
-          await sendPOL(
-            walletInfo.privateKey,
-            toAddress,
-            amount
-          );
-
-        setTxHash(hash);
-
-        await loadBalance(
-          walletInfo.address
-        );
-
-        alert(
-          "Gửi POL thành công"
-        );
-      } catch (error: any) {
-        console.error(error);
-
-        alert(
-          error?.shortMessage ||
-            error?.message ||
-            "Gửi thất bại"
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-  const handleVote =
-    async () => {
-      if (!walletInfo) {
-        alert(
-          "Vui lòng tạo hoặc import ví"
-        );
-        return;
-      }
-
-      try {
-        setLoading(true);
-
-        const hash =
-          await vote(
-            walletInfo.privateKey
-          );
-
-        console.log(
-          "Vote tx:",
-          hash
-        );
-
-        await loadVotes();
-
-        await loadBalance(
-          walletInfo.address
-        );
-
-        alert(
-          "Vote thành công"
-        );
-      } catch (error: any) {
-        console.error(error);
-
-        alert(
-          error?.shortMessage ||
-            error?.message ||
-            "Vote thất bại"
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
+  const MenuItem = ({ label, active, onClick }: any) => (
+    <div
+      onClick={onClick}
+      className={`px-3 py-2 rounded-xl cursor-pointer transition-all text-sm
+      ${
+        active
+          ? "bg-blue-600 text-white scale-[1.02]"
+          : "text-gray-400 hover:bg-white/10 hover:text-white"
+      }`}
+    >
+      {label}
+    </div>
+  );
 
   return (
-    <main className="max-w-3xl mx-auto p-8 space-y-6">
-      <h1 className="text-3xl font-bold">
-        Mini Crypto Wallet
-      </h1>
+    <main className="h-screen flex bg-[#0b0e17] text-white">
+      <Toaster />
 
-      <button
-        onClick={handleCreateWallet}
-        className="px-4 py-2 bg-black text-white rounded"
+      {/* SIDEBAR */}
+      <div
+        className={`bg-[#101422] border-r border-white/10 flex flex-col transition-all duration-300
+        ${collapsed ? "w-20" : "w-64"}`}
       >
-        Create Wallet
-      </button>
-
-      <div className="space-y-2">
-        <input
-          value={privateKey}
-          onChange={(e) =>
-            setPrivateKey(
-              e.target.value
-            )
-          }
-          placeholder="Private Key"
-          className="w-full border p-2 rounded"
-        />
-
-        <button
-          onClick={
-            handleImportPrivateKey
-          }
-          className="px-4 py-2 border rounded"
-        >
-          Import Private Key
-        </button>
-      </div>
-
-      <div className="space-y-2">
-        <textarea
-          value={mnemonic}
-          onChange={(e) =>
-            setMnemonic(
-              e.target.value
-            )
-          }
-          placeholder="Mnemonic"
-          className="w-full border p-2 rounded"
-        />
-
-        <button
-          onClick={
-            handleImportMnemonic
-          }
-          className="px-4 py-2 border rounded"
-        >
-          Import Mnemonic
-        </button>
-      </div>
-
-      <div className="border rounded p-4 space-y-3">
-        <h2 className="text-xl font-bold">
-          Voting DApp
-        </h2>
-
-        <p>
-          Total Votes: {votes}
-        </p>
-
-        <button
-          onClick={handleVote}
-          className="px-4 py-2 bg-blue-600 text-white rounded"
-        >
-          Vote
-        </button>
-
-        <button
-          onClick={loadVotes}
-          className="ml-2 px-4 py-2 border rounded"
-        >
-          Refresh Votes
-        </button>
-      </div>
-
-      {walletInfo && (
-        <div className="border rounded p-4 space-y-4">
-          <div>
-            <strong>
-              Address:
-            </strong>
-            <p className="break-all">
-              {walletInfo.address}
-            </p>
-          </div>
-
-          <div>
-            <strong>
-              Balance:
-            </strong>
-            <p>
-              {loading
-                ? "Loading..."
-                : `${balance} POL`}
-            </p>
-          </div>
-
-          <button
-            onClick={
-              handleRefreshBalance
-            }
-            className="px-3 py-2 border rounded"
-          >
-            Refresh Balance
-          </button>
-
-          <hr />
-
-          <div className="space-y-2">
-            <h2 className="font-bold">
-              Send POL
-            </h2>
-
-            <input
-              value={toAddress}
-              onChange={(e) =>
-                setToAddress(
-                  e.target.value
-                )
-              }
-              placeholder="Receiver Address"
-              className="w-full border p-2 rounded"
-            />
-
-            <input
-              value={amount}
-              onChange={(e) =>
-                setAmount(
-                  e.target.value
-                )
-              }
-              placeholder="0.1"
-              className="w-full border p-2 rounded"
-            />
+        {/* HEADER */}
+        <div className="p-4 border-b border-white/10">
+          <div className="flex justify-between items-center">
+            {!collapsed && (
+              <h1 className="font-bold text-lg">
+                🦊 MetaMask Clone
+              </h1>
+            )}
 
             <button
-              onClick={
-                handleSendPOL
-              }
-              className="px-4 py-2 bg-green-600 text-white rounded"
+              onClick={() => setCollapsed(!collapsed)}
+              className="text-xs px-2 py-1 bg-white/10 rounded-lg"
             >
-              Send POL
+              {collapsed ? "→" : "←"}
             </button>
-
-            {txHash && (
-              <p className="break-all">
-                {txHash}
-              </p>
-            )}
           </div>
+        </div>
 
-          <hr />
-
-          <div>
-            <strong>
-              Private Key:
-            </strong>
-            <p className="break-all">
-              {
-                walletInfo.privateKey
-              }
-            </p>
-          </div>
-
-          {walletInfo.mnemonic && (
-            <div>
-              <strong>
-                Mnemonic:
-              </strong>
-              <p>
-                {
-                  walletInfo.mnemonic
-                }
-              </p>
-            </div>
+        {/* NETWORK */}
+        <div className="p-3">
+          {!collapsed && (
+            <select
+              value={network}
+              onChange={(e) => setNetwork(e.target.value)}
+              className="w-full bg-black/30 p-2 rounded-lg text-xs"
+            >
+              <option>Polygon Amoy</option>
+              <option>Ethereum</option>
+              <option>Localhost</option>
+            </select>
           )}
         </div>
-      )}
+
+        {/* MENU */}
+        <div className="flex-1 p-2 space-y-2">
+          <MenuItem
+            label={collapsed ? "W" : "Wallet"}
+            active={tab === "wallet"}
+            onClick={() => setTab("wallet")}
+          />
+
+          <MenuItem
+            label={collapsed ? "A" : "Activity"}
+            active={tab === "activity"}
+            onClick={() => setTab("activity")}
+          />
+
+          <MenuItem
+            label={collapsed ? "T" : "Tokens"}
+            active={tab === "tokens"}
+            onClick={() => setTab("tokens")}
+          />
+        </div>
+
+        {/* FOOTER */}
+        <div className="p-3 border-t border-white/10">
+          <button
+            onClick={create}
+            className="w-full bg-blue-600 py-2 rounded-xl text-xs hover:scale-[1.02] transition"
+          >
+            {collapsed ? "+" : "Create Wallet"}
+          </button>
+        </div>
+      </div>
+
+      {/* MAIN */}
+      <div className="flex-1 p-6 space-y-6 overflow-auto">
+        {/* WALLET HEADER */}
+        {walletInfo && (
+          <div className="p-4 bg-[#141826] rounded-2xl border border-white/10">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-xs text-gray-400">
+                  Address
+                </p>
+                <p className="font-mono text-green-400 break-all text-sm">
+                  {walletInfo.address}
+                </p>
+              </div>
+
+              <button
+                onClick={copyAddress}
+                className="text-xs px-3 py-1 bg-white/10 rounded-lg hover:bg-white/20"
+              >
+                Copy
+              </button>
+            </div>
+
+            <div className="mt-3">
+              <p className="text-xs text-gray-400">
+                Balance
+              </p>
+              <p className="text-xl font-bold">
+                {balance} POL
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* WALLET TAB */}
+        {tab === "wallet" && (
+          <div className="grid grid-cols-2 gap-4">
+            <div className="p-4 bg-[#141826] rounded-2xl border border-white/10">
+              <h2 className="font-bold mb-3">
+                Import Wallet
+              </h2>
+
+              <input
+                className="w-full p-2 bg-black/30 rounded mb-2"
+                placeholder="Private Key"
+                value={privateKey}
+                onChange={(e) =>
+                  setPrivateKey(e.target.value)
+                }
+              />
+
+              <button
+                onClick={importPK}
+                className="w-full bg-white/10 py-2 rounded-xl mb-3 hover:bg-white/20"
+              >
+                Import
+              </button>
+
+              <textarea
+                className="w-full p-2 bg-black/30 rounded"
+                placeholder="Mnemonic"
+                value={mnemonic}
+                onChange={(e) =>
+                  setMnemonic(e.target.value)
+                }
+              />
+
+              <button
+                onClick={importMn}
+                className="w-full mt-2 bg-white/10 py-2 rounded-xl hover:bg-white/20"
+              >
+                Import Mnemonic
+              </button>
+            </div>
+
+            <div className="p-4 bg-[#141826] rounded-2xl border border-white/10">
+              <h2 className="font-bold mb-3">
+                Quick Info
+              </h2>
+
+              <p className="text-sm text-gray-400">
+                Network
+              </p>
+              <p className="mb-3">{network}</p>
+
+              <p className="text-sm text-gray-400">
+                Votes
+              </p>
+              <p>{votes}</p>
+            </div>
+          </div>
+        )}
+
+        {/* ACTIVITY TAB */}
+        {tab === "activity" && (
+          <div className="p-4 bg-[#141826] rounded-2xl border border-white/10">
+            <h2 className="font-bold mb-4">
+              Activity
+            </h2>
+
+            {history.length === 0 ? (
+              <p className="text-gray-400">
+                No transactions yet
+              </p>
+            ) : (
+              history.map((tx, i) => (
+                <div
+                  key={i}
+                  className="p-3 mb-2 bg-black/30 rounded-xl border border-white/10 hover:bg-white/5"
+                >
+                  <div className="flex justify-between">
+                    <p>
+                      {tx.type === "send"
+                        ? "📤 Send"
+                        : "🗳 Vote"}
+                    </p>
+
+                    <span
+                      className="text-blue-400 text-xs cursor-pointer"
+                      onClick={() =>
+                        openExplorer(tx.hash)
+                      }
+                    >
+                      Explorer ↗
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-gray-400 break-all">
+                    {tx.hash}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* TOKENS TAB */}
+        {tab === "tokens" && (
+          <div className="p-4 bg-[#141826] rounded-2xl border border-white/10">
+            <h2 className="font-bold mb-4">
+              Tokens
+            </h2>
+
+            <div className="text-gray-400 text-sm">
+              🪙 POL: {balance}
+            </div>
+
+            <div className="text-gray-500 text-xs mt-2">
+              (mock token list — upgrade ERC20 later)
+            </div>
+          </div>
+        )}
+      </div>
     </main>
   );
 }
