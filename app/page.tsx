@@ -4,6 +4,11 @@ import { useEffect, useState } from "react";
 import toast, { Toaster } from "react-hot-toast";
 
 import {
+  getTokenBalance,
+  sendToken,
+} from "@/lib/token";
+
+import {
   createWallet,
   importFromMnemonic,
   importFromPrivateKey,
@@ -30,6 +35,7 @@ type TxItem = {
 export default function HomePage() {
   const [walletInfo, setWalletInfo] = useState<WalletInfo | null>(null);
   const [balance, setBalance] = useState("0");
+
   const [votes, setVotes] = useState(0);
 
   const [history, setHistory] = useState<TxItem[]>([]);
@@ -42,6 +48,28 @@ export default function HomePage() {
 
   const [network, setNetwork] = useState("Polygon Amoy");
 
+  const [showMnemonic, setShowMnemonic] = useState(false);
+
+  const [bmtBalance, setBmtBalance] =
+    useState("0");
+
+  const [tokenTo, setTokenTo] =
+    useState("");
+
+  const [tokenAmount, setTokenAmount] =
+    useState("");
+
+  const [sendingToken, setSendingToken] =
+    useState(false);
+
+  const TOKENS = [
+    {
+      symbol: "BMT",
+      address:
+        "0xc61ff70FeB6a55c20840742Ce00F3D89743c0fdD",
+    },
+  ];
+
   useEffect(() => {
     const saved = localStorage.getItem("tx_history");
     if (saved) setHistory(JSON.parse(saved));
@@ -50,6 +78,9 @@ export default function HomePage() {
   useEffect(() => {
     loadVotes();
   }, []);
+
+  const BMT_ADDRESS =
+  "0xc61ff70FeB6a55c20840742Ce00F3D89743c0fdD";
 
   const loadVotes = async () => {
     try {
@@ -65,6 +96,32 @@ export default function HomePage() {
     } catch {}
   };
 
+  const loadTokens = async (
+    address: string
+  ) => {
+    try {
+      const bmt =
+        await getTokenBalance(
+          TOKENS[0]
+            .address as `0x${string}`,
+          address as `0x${string}`
+        );
+
+      setBmtBalance(bmt);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const loadWalletData = async (
+    address: string
+  ) => {
+    await Promise.all([
+      loadBalance(address),
+      loadTokens(address),
+    ]);
+  };
+
   const addTx = (tx: TxItem) => {
     setHistory((prev) => {
       const updated = [tx, ...prev];
@@ -76,30 +133,61 @@ export default function HomePage() {
   // ---------------- WALLET ----------------
   const create = async () => {
     const w = createWallet();
+
     setWalletInfo(w);
-    await loadBalance(w.address);
-    toast.success("Wallet created");
+
+    await loadWalletData(
+      w.address
+    );
+
+    toast.success(
+      "Wallet created"
+    );
   };
 
   const importPK = async () => {
     try {
-      const w = importFromPrivateKey(privateKey);
+      const w =
+        importFromPrivateKey(
+          privateKey
+        );
+
       setWalletInfo(w);
-      await loadBalance(w.address);
-      toast.success("Imported");
+
+      await loadWalletData(
+        w.address
+      );
+
+      toast.success(
+        "Imported"
+      );
     } catch {
-      toast.error("Invalid private key");
+      toast.error(
+        "Invalid private key"
+      );
     }
   };
 
   const importMn = async () => {
     try {
-      const w = importFromMnemonic(mnemonic);
+      const w =
+        importFromMnemonic(
+          mnemonic
+        );
+
       setWalletInfo(w);
-      await loadBalance(w.address);
-      toast.success("Imported");
+
+      await loadWalletData(
+        w.address
+      );
+
+      toast.success(
+        "Imported"
+      );
     } catch {
-      toast.error("Invalid mnemonic");
+      toast.error(
+        "Invalid mnemonic"
+      );
     }
   };
 
@@ -108,6 +196,51 @@ export default function HomePage() {
     if (!walletInfo) return;
     navigator.clipboard.writeText(walletInfo.address);
     toast.success("Address copied");
+  };
+
+  const sendBMT = async () => {
+    if (!walletInfo)
+      return toast.error(
+        "No wallet"
+      );
+
+    try {
+      setSendingToken(true);
+
+      const hash =
+        await sendToken(
+          TOKENS[0].address,
+          walletInfo.privateKey,
+          tokenTo,
+          tokenAmount
+        );
+
+      addTx({
+        hash,
+        type: "send",
+        timestamp: Date.now(),
+        status: "success",
+        amount: tokenAmount,
+        to: tokenTo,
+      });
+
+      await loadTokens(
+        walletInfo.address
+      );
+
+      toast.success(
+        "BMT sent"
+      );
+    } catch (e: any) {
+      console.error(e);
+
+      toast.error(
+        e?.message ||
+          "Send failed"
+      );
+    } finally {
+      setSendingToken(false);
+    }
   };
 
   const openExplorer = (hash: string) => {
@@ -236,6 +369,39 @@ export default function HomePage() {
               <p className="text-xl font-bold">
                 {balance} POL
               </p>
+
+              {walletInfo?.mnemonic && (
+                <div className="mt-4 border-t border-white/10 pt-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-gray-400">
+                      Recovery Phrase
+                    </p>
+
+                    <button
+                      onClick={() =>
+                        setShowMnemonic(!showMnemonic)
+                      }
+                      className="text-xs px-2 py-1 rounded bg-white/10 hover:bg-white/20"
+                    >
+                      {showMnemonic
+                        ? "Hide"
+                        : "Reveal"}
+                    </button>
+                  </div>
+
+                  <div className="mt-2 p-3 rounded-xl bg-black/30 border border-white/10">
+                    {showMnemonic ? (
+                      <p className="text-sm break-words">
+                        {walletInfo.mnemonic}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-gray-500">
+                        ••••• ••••• ••••• •••••
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -349,12 +515,60 @@ export default function HomePage() {
               Tokens
             </h2>
 
-            <div className="text-gray-400 text-sm">
-              🪙 POL: {balance}
-            </div>
+            <div className="space-y-4">
+              <div className="p-4 rounded-xl bg-black/30">
+                <div className="text-sm text-gray-400">
+                  Token
+                </div>
 
-            <div className="text-gray-500 text-xs mt-2">
-              (mock token list — upgrade ERC20 later)
+                <div className="text-xl font-bold">
+                  🏸 BMT
+                </div>
+
+                <div className="text-green-400 mt-1">
+                  {bmtBalance}
+                </div>
+              </div>
+
+              <input
+                value={tokenTo}
+                onChange={(e) =>
+                  setTokenTo(
+                    e.target.value
+                  )
+                }
+                placeholder="Receiver address"
+                className="w-full p-3 rounded-xl bg-black/30 border border-white/10"
+              />
+
+              <input
+                value={tokenAmount}
+                onChange={(e) =>
+                  setTokenAmount(
+                    e.target.value
+                  )
+                }
+                placeholder="Amount"
+                className="w-full p-3 rounded-xl bg-black/30 border border-white/10"
+              />
+
+              <button
+                disabled={sendingToken}
+                onClick={sendBMT}
+                className="
+                  w-full
+                  py-3
+                  rounded-xl
+                  bg-green-600
+                  hover:bg-green-500
+                  disabled:opacity-50
+                  disabled:cursor-not-allowed
+                "
+              >
+                {sendingToken
+                  ? "Sending..."
+                  : "Send BMT"}
+              </button>
             </div>
           </div>
         )}

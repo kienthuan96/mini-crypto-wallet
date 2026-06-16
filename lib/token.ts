@@ -1,16 +1,25 @@
 import { createPublicClient, http } from "viem";
 import { polygonAmoy } from "viem/chains";
 
-const client = createPublicClient({
-  chain: polygonAmoy,
-  transport: http(),
-});
+import {
+  Contract,
+  Wallet,
+  parseUnits,
+} from "ethers";
 
-const ERC20_ABI = [
+import { provider } from "./provider";
+
+export const client =
+  createPublicClient({
+    chain: polygonAmoy,
+    transport: http(),
+  });
+
+export const ERC20_ABI = [
   {
     type: "function",
-    stateMutability: "view",
     name: "balanceOf",
+    stateMutability: "view",
     inputs: [
       {
         name: "owner",
@@ -19,20 +28,38 @@ const ERC20_ABI = [
     ],
     outputs: [
       {
-        name: "",
         type: "uint256",
       },
     ],
   },
   {
     type: "function",
-    stateMutability: "view",
     name: "decimals",
+    stateMutability: "view",
     inputs: [],
     outputs: [
       {
-        name: "",
         type: "uint8",
+      },
+    ],
+  },
+  {
+    type: "function",
+    name: "transfer",
+    stateMutability: "nonpayable",
+    inputs: [
+      {
+        name: "to",
+        type: "address",
+      },
+      {
+        name: "amount",
+        type: "uint256",
+      },
+    ],
+    outputs: [
+      {
+        type: "bool",
       },
     ],
   },
@@ -42,21 +69,60 @@ export async function getTokenBalance(
   tokenAddress: `0x${string}`,
   walletAddress: `0x${string}`
 ) {
-  const balance = await client.readContract({
-    address: tokenAddress,
-    abi: ERC20_ABI,
-    functionName: "balanceOf",
-    args: [walletAddress],
-  });
+  const balance =
+    await client.readContract({
+      address: tokenAddress,
+      abi: ERC20_ABI,
+      functionName: "balanceOf",
+      args: [walletAddress],
+    });
 
-  const decimals = await client.readContract({
-    address: tokenAddress,
-    abi: ERC20_ABI,
-    functionName: "decimals",
-  });
+  const decimals =
+    await client.readContract({
+      address: tokenAddress,
+      abi: ERC20_ABI,
+      functionName: "decimals",
+    });
 
   return (
     Number(balance) /
-    Math.pow(10, Number(decimals))
+    10 ** Number(decimals)
   ).toString();
+}
+
+export async function sendToken(
+  tokenAddress: string,
+  privateKey: string,
+  to: string,
+  amount: string
+) {
+  const wallet = new Wallet(
+    privateKey,
+    provider
+  );
+
+  const contract = new Contract(
+    tokenAddress,
+    [
+      "function transfer(address to,uint256 amount) returns(bool)",
+      "function decimals() view returns(uint8)",
+    ],
+    wallet
+  );
+
+  const decimals =
+    await contract.decimals();
+
+  const tx =
+    await contract.transfer(
+      to,
+      parseUnits(
+        amount,
+        Number(decimals)
+      )
+    );
+
+  await tx.wait();
+
+  return tx.hash;
 }
