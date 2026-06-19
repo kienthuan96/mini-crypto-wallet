@@ -18,16 +18,31 @@ import { useTokens } from "@/hooks/useTokens";
 
 export default function HomePage() {
   // ---------------- UI STATE ----------------
-  const [tab, setTab] = useState<"wallet" | "activity" | "tokens">("wallet");
-  const [collapsed, setCollapsed] = useState(false);
-  const [network, setNetwork] = useState("Polygon Amoy");
+  const [tab, setTab] = useState<
+    "wallet" | "activity" | "tokens"
+  >("wallet");
 
-  const [tokenTo, setTokenTo] = useState("");
-  const [tokenAmount, setTokenAmount] = useState("");
-  const [sendingToken, setSendingToken] = useState(false);
+  const [collapsed, setCollapsed] =
+    useState(false);
+
+  const [network, setNetwork] =
+    useState("Polygon Amoy");
+
+  const [tokenTo, setTokenTo] =
+    useState("");
+
+  const [tokenAmount, setTokenAmount] =
+    useState("");
+
+  const [sendingToken, setSendingToken] =
+    useState(false);
 
   // ---------------- HOOKS ----------------
-  const { balance, bmtBalance, votes, loadWalletData } = useBalance();
+  const {
+    balance,
+    votes,
+    loadWalletData,
+  } = useBalance();
 
   const {
     walletInfo,
@@ -41,48 +56,60 @@ export default function HomePage() {
     copyAddress,
   } = useWallet(loadWalletData);
 
-  const { history, addTx } = useTxHistory();
+  const { history, addTx } =
+    useTxHistory();
 
-  const { tokens, addToken } = useTokens();
+  const {
+    tokens,
+    addToken,
+  } = useTokens();
 
-  const [tokenBalances, setTokenBalances] = useState<Record<string, string>>({});
+  // ---------------- TOKEN BALANCES ----------------
+  const [tokenBalances, setTokenBalances] =
+    useState<Record<string, string>>({});
 
   useEffect(() => {
-    const loadTokenBalances = async () => {
-      if (!walletInfo) return;
+    const loadTokenBalances =
+      async () => {
+        if (!walletInfo) return;
 
-      const balances: Record<string, string> = {};
+        const balances: Record<
+          string,
+          string
+        > = {};
 
-      for (const token of tokens) {
-        try {
-          balances[token.address] =
-            await blockchain.getTokenBalance(
-              token.address,
-              walletInfo.address
-            );
-        } catch {
-          balances[token.address] = "0";
+        for (const token of tokens) {
+          try {
+            balances[token.address] =
+              await blockchain.getTokenBalance(
+                token.address,
+                walletInfo.address
+              );
+          } catch {
+            balances[token.address] = "0";
+          }
         }
-      }
 
-      setTokenBalances(balances);
-    };
+        setTokenBalances(balances);
+      };
 
     loadTokenBalances();
   }, [tokens, walletInfo]);
 
-  // ---------------- SEND TOKEN ----------------
+  // ---------------- SEND BMT ----------------
   const sendBMT = async () => {
-    if (!walletInfo) return toast.error("No wallet");
+    if (!walletInfo)
+      return toast.error("No wallet");
 
     try {
       setSendingToken(true);
 
-      const hash = await blockchain.sendBMT(
-        walletInfo.privateKey,
-        tokenTo,
-        tokenAmount
-      );
+      const hash =
+        await blockchain.sendBMT(
+          walletInfo.privateKey,
+          tokenTo,
+          tokenAmount
+        );
 
       addTx({
         hash,
@@ -93,21 +120,49 @@ export default function HomePage() {
         to: tokenTo,
       });
 
-      await loadWalletData(walletInfo.address);
+      await loadWalletData(
+        walletInfo.address
+      );
 
       toast.success("BMT sent");
     } catch (e: any) {
-      toast.error(e?.message || "Send failed");
+      toast.error(
+        e?.message || "Send failed"
+      );
     } finally {
       setSendingToken(false);
     }
   };
 
-  const openExplorer = (hash: string) => {
+  const openExplorer = (
+    hash: string
+  ) => {
     window.open(
       `https://amoy.polygonscan.com/tx/${hash}`,
       "_blank"
     );
+  };
+
+  const importToken = async (
+    address: string
+  ) => {
+    try {
+      const token =
+        await blockchain.getTokenInfo(
+          address
+        );
+
+      addToken(token);
+
+      toast.success(
+        `${token.symbol} imported`
+      );
+    } catch (e: any) {
+      toast.error(
+        e?.message ||
+          "Invalid token contract"
+      );
+    }
   };
 
   return (
@@ -128,8 +183,6 @@ export default function HomePage() {
           balance={balance}
           copyAddress={copyAddress}
         />
-
-        <div className="flex gap-2">
 
         {tab === "wallet" && (
           <WalletTab
@@ -154,9 +207,9 @@ export default function HomePage() {
         {tab === "tokens" && (
           <TokenTab
             nativeBalance={balance}
-            bmtBalance={bmtBalance}
             tokens={tokens}
             tokenBalances={tokenBalances}
+            importToken={importToken}
             tokenTo={tokenTo}
             setTokenTo={setTokenTo}
             tokenAmount={tokenAmount}
@@ -166,7 +219,6 @@ export default function HomePage() {
           />
         )}
       </div>
-    </div>
-  </main>
-);
+    </main>
+  );
 }

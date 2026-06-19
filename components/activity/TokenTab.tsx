@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 type TokenInfo = {
   address: string;
   name: string;
@@ -9,7 +11,6 @@ type TokenInfo = {
 
 type Props = {
   nativeBalance: string;
-  bmtBalance: string;
 
   tokens: TokenInfo[];
 
@@ -18,8 +19,14 @@ type Props = {
     string
   >;
 
+  importToken: (
+    address: string
+  ) => Promise<void>;
+
   tokenTo: string;
-  setTokenTo: (value: string) => void;
+  setTokenTo: (
+    value: string
+  ) => void;
 
   tokenAmount: string;
   setTokenAmount: (
@@ -33,9 +40,9 @@ type Props = {
 
 export default function TokenTab({
   nativeBalance,
-  bmtBalance,
   tokens,
   tokenBalances,
+  importToken,
   tokenTo,
   setTokenTo,
   tokenAmount,
@@ -43,6 +50,11 @@ export default function TokenTab({
   sendingToken,
   sendBMT,
 }: Props) {
+  const [
+    contractAddress,
+    setContractAddress,
+  ] = useState("");
+
   return (
     <div className="space-y-4">
       {/* Assets */}
@@ -100,9 +112,14 @@ export default function TokenTab({
                 </div>
 
                 <div className="text-[10px] text-gray-500 mt-1">
-                  {token.address.slice(0, 6)}
+                  {token.address.slice(
+                    0,
+                    6
+                  )}
                   ...
-                  {token.address.slice(-4)}
+                  {token.address.slice(
+                    -4
+                  )}
                 </div>
               </div>
 
@@ -126,6 +143,56 @@ export default function TokenTab({
             </div>
           )}
         </div>
+      </div>
+
+      {/* Import Token */}
+      <div className="p-4 bg-[#141826] rounded-2xl border border-white/10">
+        <h2 className="font-bold mb-4">
+          Import Token
+        </h2>
+
+        <input
+          value={contractAddress}
+          onChange={(e) =>
+            setContractAddress(
+              e.target.value
+            )
+          }
+          placeholder="Contract Address"
+          className="
+            w-full
+            p-3
+            rounded-xl
+            bg-black/30
+            border
+            border-white/10
+          "
+        />
+
+        <button
+          onClick={async () => {
+            if (
+              !contractAddress.trim()
+            )
+              return;
+
+            await importToken(
+              contractAddress
+            );
+
+            setContractAddress("");
+          }}
+          className="
+            mt-3
+            w-full
+            py-3
+            rounded-xl
+            bg-blue-600
+            hover:bg-blue-500
+          "
+        >
+          Import Token
+        </button>
       </div>
 
       {/* Send Token */}

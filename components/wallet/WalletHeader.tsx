@@ -19,9 +19,10 @@ export default function WalletHeader({
   balance,
   copyAddress,
 }: Props) {
-  if (!walletInfo) return null;
 
   const [showMnemonic, setShowMnemonic] = useState(false);
+
+  if (!walletInfo) return null;
 
   return (
     <div className="p-4 bg-[#141826] rounded-2xl border border-white/10">
@@ -50,7 +51,7 @@ export default function WalletHeader({
         </p>
 
         <p className="text-2xl font-bold">
-          {balance} POL
+          {Number(balance).toFixed(4)} POL
         </p>
       </div>
 
