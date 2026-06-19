@@ -9,13 +9,14 @@ import WalletTab from "@/components/activity/WalletTab";
 import ActivityTab from "@/components/activity/ActivityTab";
 import TokenTab from "@/components/activity/TokenTab";
 
-import { sendToken } from "@/lib/token";
+import { blockchain } from "@/services/blockchain";
 
 import { useWallet } from "@/hooks/useWallet";
 import { useBalance } from "@/hooks/useBalance";
 import { useTxHistory } from "@/hooks/useTxHistory";
 
 export default function HomePage() {
+  // ---------------- UI STATE ----------------
   const [tab, setTab] = useState<"wallet" | "activity" | "tokens">("wallet");
   const [collapsed, setCollapsed] = useState(false);
   const [network, setNetwork] = useState("Polygon Amoy");
@@ -29,7 +30,6 @@ export default function HomePage() {
 
   const {
     walletInfo,
-    setWalletInfo,
     privateKey,
     setPrivateKey,
     mnemonic,
@@ -49,8 +49,7 @@ export default function HomePage() {
     try {
       setSendingToken(true);
 
-      const hash = await sendToken(
-        "0xc61ff70FeB6a55c20840742Ce00F3D89743c0fdD",
+      const hash = await blockchain.sendBMT(
         walletInfo.privateKey,
         tokenTo,
         tokenAmount
