@@ -14,10 +14,12 @@ import { blockchain } from "@/services/blockchain";
 import { useWallet } from "@/hooks/useWallet";
 import { useBalance } from "@/hooks/useBalance";
 import { useTxHistory } from "@/hooks/useTxHistory";
-import { useTokens } from "@/hooks/useTokens";
+import {
+  useTokens,
+  type TokenInfo,
+} from "@/hooks/useTokens";
 
 export default function HomePage() {
-  // ---------------- UI STATE ----------------
   const [tab, setTab] = useState<
     "wallet" | "activity" | "tokens"
   >("wallet");
@@ -37,7 +39,6 @@ export default function HomePage() {
   const [sendingToken, setSendingToken] =
     useState(false);
 
-  // ---------------- HOOKS ----------------
   const {
     balance,
     votes,
@@ -62,12 +63,20 @@ export default function HomePage() {
   const {
     tokens,
     addToken,
+    removeToken,
   } = useTokens();
 
-  // ---------------- TOKEN BALANCES ----------------
   const [tokenBalances, setTokenBalances] =
-    useState<Record<string, string>>({});
+    useState<Record<string, string>>(
+      {}
+    );
 
+  const [removeTimer, setRemoveTimer] =
+    useState<NodeJS.Timeout | null>(
+      null
+    );
+
+  // ---------------- TOKEN BALANCES ----------------
   useEffect(() => {
     const loadTokenBalances =
       async () => {
@@ -86,20 +95,25 @@ export default function HomePage() {
                 walletInfo.address
               );
           } catch {
-            balances[token.address] = "0";
+            balances[token.address] =
+              "0";
           }
         }
 
-        setTokenBalances(balances);
+        setTokenBalances(
+          balances
+        );
       };
 
     loadTokenBalances();
   }, [tokens, walletInfo]);
 
-  // ---------------- SEND BMT ----------------
+  // ---------------- SEND TOKEN ----------------
   const sendBMT = async () => {
     if (!walletInfo)
-      return toast.error("No wallet");
+      return toast.error(
+        "No wallet"
+      );
 
     try {
       setSendingToken(true);
@@ -127,13 +141,15 @@ export default function HomePage() {
       toast.success("BMT sent");
     } catch (e: any) {
       toast.error(
-        e?.message || "Send failed"
+        e?.message ||
+          "Send failed"
       );
     } finally {
       setSendingToken(false);
     }
   };
 
+  // ---------------- EXPLORER ----------------
   const openExplorer = (
     hash: string
   ) => {
@@ -143,6 +159,7 @@ export default function HomePage() {
     );
   };
 
+  // ---------------- IMPORT TOKEN ----------------
   const importToken = async (
     address: string
   ) => {
@@ -165,57 +182,178 @@ export default function HomePage() {
     }
   };
 
+  // ---------------- REMOVE TOKEN + UNDO ----------------
+  const handleRemoveToken = (
+    token: TokenInfo
+  ) => {
+    removeToken(
+      token.address
+    );
+
+    if (removeTimer) {
+      clearTimeout(
+        removeTimer
+      );
+    }
+
+    const timer = setTimeout(
+      () => {},
+      5000
+    );
+
+    setRemoveTimer(timer);
+
+    toast(
+      (t) => (
+        <div className="flex items-center gap-3">
+          <span>
+            {token.symbol} removed
+          </span>
+
+          <button
+            onClick={() => {
+              addToken(token);
+
+              clearTimeout(
+                timer
+              );
+
+              toast.dismiss(
+                t.id
+              );
+
+              toast.success(
+                `${token.symbol} restored`
+              );
+            }}
+            className="
+              px-3
+              py-1.5
+              text-xs
+              font-medium
+              rounded-md
+              bg-blue-600
+              text-white
+              shadow-sm
+              hover:bg-blue-500
+              active:scale-95
+              transition-all
+              duration-150
+              focus:outline-none
+              focus:ring-2
+              focus:ring-blue-400
+              focus:ring-offset-1
+            "
+          >
+            Undo
+          </button>
+        </div>
+      ),
+      {
+        duration: 5000,
+      }
+    );
+  };
+
   return (
     <main className="h-screen flex bg-[#0b0e17] text-white">
       <Sidebar
         collapsed={collapsed}
-        setCollapsed={setCollapsed}
+        setCollapsed={
+          setCollapsed
+        }
         tab={tab}
         setTab={setTab}
         network={network}
-        setNetwork={setNetwork}
+        setNetwork={
+          setNetwork
+        }
         create={create}
       />
 
       <div className="flex-1 p-6 space-y-6 overflow-auto">
         <WalletHeader
-          walletInfo={walletInfo}
+          walletInfo={
+            walletInfo
+          }
           balance={balance}
-          copyAddress={copyAddress}
+          copyAddress={
+            copyAddress
+          }
         />
 
-        {tab === "wallet" && (
+        {tab ===
+          "wallet" && (
           <WalletTab
-            privateKey={privateKey}
-            setPrivateKey={setPrivateKey}
-            mnemonic={mnemonic}
-            setMnemonic={setMnemonic}
-            importPK={importPK}
-            importMn={importMn}
-            network={network}
+            privateKey={
+              privateKey
+            }
+            setPrivateKey={
+              setPrivateKey
+            }
+            mnemonic={
+              mnemonic
+            }
+            setMnemonic={
+              setMnemonic
+            }
+            importPK={
+              importPK
+            }
+            importMn={
+              importMn
+            }
+            network={
+              network
+            }
             votes={votes}
           />
         )}
 
-        {tab === "activity" && (
+        {tab ===
+          "activity" && (
           <ActivityTab
-            history={history}
-            openExplorer={openExplorer}
+            history={
+              history
+            }
+            openExplorer={
+              openExplorer
+            }
           />
         )}
 
-        {tab === "tokens" && (
+        {tab ===
+          "tokens" && (
           <TokenTab
-            nativeBalance={balance}
+            nativeBalance={
+              balance
+            }
             tokens={tokens}
-            tokenBalances={tokenBalances}
-            importToken={importToken}
+            tokenBalances={
+              tokenBalances
+            }
+            importToken={
+              importToken
+            }
+            removeToken={
+              handleRemoveToken
+            }
             tokenTo={tokenTo}
-            setTokenTo={setTokenTo}
-            tokenAmount={tokenAmount}
-            setTokenAmount={setTokenAmount}
-            sendingToken={sendingToken}
-            sendBMT={sendBMT}
+            setTokenTo={
+              setTokenTo
+            }
+            tokenAmount={
+              tokenAmount
+            }
+            setTokenAmount={
+              setTokenAmount
+            }
+            sendingToken={
+              sendingToken
+            }
+            sendBMT={
+              sendBMT
+            }
           />
         )}
       </div>

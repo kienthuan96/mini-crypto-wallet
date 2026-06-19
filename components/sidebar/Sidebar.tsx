@@ -39,7 +39,7 @@ export default function Sidebar({
         <div className="flex justify-between">
           {!collapsed && (
             <h1 className="font-bold">
-              🦊 MetaMask Clone
+              🐭 MouseWallet
             </h1>
           )}
 
