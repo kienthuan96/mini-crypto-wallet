@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import toast, { Toaster } from "react-hot-toast";
+import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 
 import Sidebar from "@/components/sidebar/Sidebar";
 import WalletHeader from "@/components/wallet/WalletHeader";
@@ -14,6 +14,7 @@ import { blockchain } from "@/services/blockchain";
 import { useWallet } from "@/hooks/useWallet";
 import { useBalance } from "@/hooks/useBalance";
 import { useTxHistory } from "@/hooks/useTxHistory";
+import { useTokens } from "@/hooks/useTokens";
 
 export default function HomePage() {
   // ---------------- UI STATE ----------------
@@ -41,6 +42,34 @@ export default function HomePage() {
   } = useWallet(loadWalletData);
 
   const { history, addTx } = useTxHistory();
+
+  const { tokens, addToken } = useTokens();
+
+  const [tokenBalances, setTokenBalances] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const loadTokenBalances = async () => {
+      if (!walletInfo) return;
+
+      const balances: Record<string, string> = {};
+
+      for (const token of tokens) {
+        try {
+          balances[token.address] =
+            await blockchain.getTokenBalance(
+              token.address,
+              walletInfo.address
+            );
+        } catch {
+          balances[token.address] = "0";
+        }
+      }
+
+      setTokenBalances(balances);
+    };
+
+    loadTokenBalances();
+  }, [tokens, walletInfo]);
 
   // ---------------- SEND TOKEN ----------------
   const sendBMT = async () => {
@@ -83,8 +112,6 @@ export default function HomePage() {
 
   return (
     <main className="h-screen flex bg-[#0b0e17] text-white">
-      <Toaster />
-
       <Sidebar
         collapsed={collapsed}
         setCollapsed={setCollapsed}
@@ -101,6 +128,8 @@ export default function HomePage() {
           balance={balance}
           copyAddress={copyAddress}
         />
+
+        <div className="flex gap-2">
 
         {tab === "wallet" && (
           <WalletTab
@@ -124,7 +153,10 @@ export default function HomePage() {
 
         {tab === "tokens" && (
           <TokenTab
+            nativeBalance={balance}
             bmtBalance={bmtBalance}
+            tokens={tokens}
+            tokenBalances={tokenBalances}
             tokenTo={tokenTo}
             setTokenTo={setTokenTo}
             tokenAmount={tokenAmount}
@@ -134,6 +166,7 @@ export default function HomePage() {
           />
         )}
       </div>
-    </main>
-  );
+    </div>
+  </main>
+);
 }

@@ -3,6 +3,7 @@ import { getVotes } from "@/lib/voting";
 import {
   getTokenBalance,
   sendToken,
+  getTokenInfo,
 } from "@/lib/token";
 
 const TOKENS = {
@@ -17,6 +18,16 @@ export const blockchain = {
 
   getVotes: async () => {
     return await getVotes();
+  },
+
+  getTokenBalance: async (
+    tokenAddress: string,
+    address: string
+  ) => {
+    return await getTokenBalance(
+      tokenAddress as `0x${string}`,
+      address as `0x${string}`
+    );
   },
 
   // ---------------- TOKEN ----------------
@@ -37,6 +48,14 @@ export const blockchain = {
       privateKey,
       to,
       amount
+    );
+  },
+
+  getTokenInfo: async (
+    tokenAddress: string
+  ) => {
+    return await getTokenInfo(
+      tokenAddress as `0x${string}`
     );
   },
 };

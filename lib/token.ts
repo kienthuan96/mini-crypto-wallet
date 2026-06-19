@@ -63,6 +63,20 @@ export const ERC20_ABI = [
       },
     ],
   },
+  {
+    type: "function",
+    name: "name",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "string" }],
+  },
+  {
+    type: "function",
+    name: "symbol",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "string" }],
+  },
 ] as const;
 
 export async function getTokenBalance(
@@ -125,4 +139,34 @@ export async function sendToken(
   await tx.wait();
 
   return tx.hash;
+}
+
+export async function getTokenInfo(
+  tokenAddress: `0x${string}`
+) {
+  const [name, symbol, decimals] =
+    await Promise.all([
+      client.readContract({
+        address: tokenAddress,
+        abi: ERC20_ABI,
+        functionName: "name",
+      }),
+      client.readContract({
+        address: tokenAddress,
+        abi: ERC20_ABI,
+        functionName: "symbol",
+      }),
+      client.readContract({
+        address: tokenAddress,
+        abi: ERC20_ABI,
+        functionName: "decimals",
+      }),
+    ]);
+
+  return {
+    address: tokenAddress,
+    name,
+    symbol,
+    decimals: Number(decimals),
+  };
 }
